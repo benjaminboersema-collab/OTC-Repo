@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Challenge, Membership, BonusChallenge } from "@/lib/types";
-import { updateSettings, postBonus } from "./actions";
+import { updateSettings, postBonus, deleteChallenge } from "./actions";
 import InviteBox from "./InviteBox";
 import RosterRow from "./RosterRow";
 import BonusRow from "./BonusRow";
@@ -29,6 +29,7 @@ export default async function OwnerPage({ params }: { params: { id: string } }) 
 
   const save = updateSettings.bind(null, params.id);
   const addBonus = postBonus.bind(null, params.id);
+  const removeChallenge = deleteChallenge.bind(null, params.id);
 
   return (
     <main style={{ paddingTop: 4 }}>
@@ -116,6 +117,21 @@ export default async function OwnerPage({ params }: { params: { id: string } }) 
           <input className="input" name="title" placeholder="e.g. 10,000 steps every day" />
           <button className="btn ghost mt14" type="submit">Post bonus challenge</button>
           <p className="note">Posting for a week that already has one will replace it.</p>
+        </form>
+      </div>
+
+      <h3 className="sec" style={{ color: "#ff6b6b" }}>Danger zone</h3>
+      <div className="card" style={{ padding: 18, border: "1px solid rgba(255,107,107,0.35)" }}>
+        <p className="note" style={{ marginTop: 0 }}>
+          Deleting <b>{ch.name}</b> permanently removes the challenge, its roster, every
+          logged entry and all bonus challenges. This cannot be undone.
+        </p>
+        <form action={removeChallenge}>
+          <label className="fld">Type <b>{ch.name}</b> to confirm</label>
+          <input className="input" name="confirm_name" placeholder={ch.name} autoComplete="off" required />
+          <button className="btn ghost mt14" type="submit" style={{ borderColor: "#ff6b6b", color: "#ff6b6b" }}>
+            Delete this challenge
+          </button>
         </form>
       </div>
 

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 async function assertOwner(challengeId: string) {
@@ -72,4 +73,23 @@ export async function deleteBonus(challengeId: string, bonusId: string) {
   const supabase = await assertOwner(challengeId);
   await supabase.from("bonus_challenges").delete().eq("id", bonusId);
   revalidatePath(`/c/${challengeId}/owner`);
+}
+
+export async function deleteChallenge(challengeId: string, formData: FormData) {
+  const supabase = await assertOwner(challengeId);
+
+  const { data: ch } = await supabase
+    .from("challenges").select("name").eq("id", challengeId).single();
+  if (!ch) throw new Error("Challenge not found");
+
+  const typed = ((formData.get("confirm_name") as string) || "").trim();
+  if (typed !== (ch.name as string).trim()) {
+    throw new Error("Type the challenge name exactly to confirm deletion");
+  }
+
+  const { error } = await supabase.from("challenges").delete().eq("id", challengeId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard");
+  redirect("/dashboard");
 }

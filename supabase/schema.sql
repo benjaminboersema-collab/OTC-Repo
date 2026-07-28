@@ -163,7 +163,11 @@ grant  select (id, display_name, created_at) on public.profiles to anon, authent
 
 -- challenges
 drop policy if exists challenges_select on public.challenges;
-create policy challenges_select on public.challenges for select using (is_member(id));
+-- NOTE: `or owner_id = auth.uid()` is required. createChallenge does
+-- insert().select(), and PostgREST's RETURNING clause is evaluated against this
+-- SELECT policy *before* the owner's memberships row exists -> 42501 otherwise.
+create policy challenges_select on public.challenges
+  for select using (is_member(id) or owner_id = auth.uid());
 drop policy if exists challenges_insert on public.challenges;
 create policy challenges_insert on public.challenges for insert with check (owner_id = auth.uid());
 drop policy if exists challenges_update on public.challenges;
