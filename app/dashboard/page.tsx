@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { createChallenge } from "./actions";
+import { createChallenge, setPin } from "./actions";
 
 export default async function Dashboard() {
   const supabase = createClient();
@@ -63,6 +63,23 @@ export default async function Dashboard() {
             </div>
             <button className="btn mt20" type="submit">Create challenge →</button>
             <p className="note">You'll become the owner and get an invite link to send your team.</p>
+          </form>
+        </div>
+        <h3 className="sec">Your PIN</h3>
+        <div className="card" style={{ padding: 18 }}>
+          <form action={setPin}>
+            <p className="note" style={{ marginTop: 0 }}>
+              Set or change the 6-digit PIN you use to sign in.
+            </p>
+            <label className="fld">New PIN</label>
+            <input className="input" name="pin" type="password" inputMode="numeric"
+              maxLength={6} required placeholder="••••••" autoComplete="new-password"
+              style={{ letterSpacing: "8px", fontSize: 20, textAlign: "center" }} />
+            <label className="fld">Confirm PIN</label>
+            <input className="input" name="pin2" type="password" inputMode="numeric"
+              maxLength={6} required placeholder="••••••" autoComplete="new-password"
+              style={{ letterSpacing: "8px", fontSize: 20, textAlign: "center" }} />
+            <button className="btn ghost mt14" type="submit">Save PIN</button>
           </form>
         </div>
       </main>

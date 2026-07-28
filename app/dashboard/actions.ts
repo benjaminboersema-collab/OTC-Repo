@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 export async function createChallenge(formData: FormData) {
@@ -29,4 +30,21 @@ export async function createChallenge(formData: FormData) {
   });
 
   redirect(`/c/${challenge.id}`);
+}
+
+export async function setPin(formData: FormData) {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const pin = ((formData.get("pin") as string) || "").trim();
+  const pin2 = ((formData.get("pin2") as string) || "").trim();
+
+  if (!/^\d{6}$/.test(pin)) throw new Error("Your PIN must be exactly 6 digits.");
+  if (pin !== pin2) throw new Error("The two PINs don't match.");
+
+  const { error } = await supabase.auth.updateUser({ password: pin });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard");
 }
