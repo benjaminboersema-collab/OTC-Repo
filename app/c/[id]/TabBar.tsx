@@ -7,9 +7,10 @@ export default function TabBar({ id, isOwner }: { id: string; isOwner: boolean }
   const path = usePathname();
   const base = `/c/${id}`;
   const tabs = [
-    { href: base, label: "Leaderboard", icon: "🏆", match: (p: string) => p === base },
+    { href: base, label: "Board", icon: "🏆", match: (p: string) => p === base },
     { href: `${base}/checkin`, label: "Check-in", icon: "✅", match: (p: string) => p.startsWith(`${base}/checkin`) },
     { href: `${base}/progress`, label: "Progress", icon: "📈", match: (p: string) => p.startsWith(`${base}/progress`) },
+    { href: `${base}/rules`, label: "Rules", icon: "📋", match: (p: string) => p.startsWith(`${base}/rules`) },
   ];
   if (isOwner) tabs.push({ href: `${base}/owner`, label: "Owner", icon: "⚙️", match: (p: string) => p.startsWith(`${base}/owner`) });
 

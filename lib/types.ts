@@ -8,6 +8,8 @@ export interface Challenge {
   name: string;
   start_date: string; // ISO date
   weeks: number;
+  end_date: string | null;
+  end_time: string;
   timezone: string;
   buyin_amount: number;
   currency: string;
@@ -54,3 +56,6 @@ export interface BonusChallenge {
   title: string;
   points: number;
 }
+
+/** Max exercise sessions that can be logged in a single day. */
+export const EX_MAX = 3;
