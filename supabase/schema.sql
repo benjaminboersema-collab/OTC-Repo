@@ -25,6 +25,8 @@ create table if not exists public.challenges (
   name         text not null default 'Our Team Challenge',
   start_date   date not null default current_date,
   weeks        int  not null default 10,
+  end_date     date,                                   -- authoritative end (null = derive from weeks)
+  end_time     time not null default '18:00',          -- logging cut-off, avoids a midnight scramble
   timezone     text not null default 'Africa/Johannesburg',
   buyin_amount numeric not null default 0,
   currency     text not null default 'ZAR',
@@ -55,18 +57,23 @@ create table if not exists public.entries (
   user_id      uuid not null references public.profiles(id) on delete cascade,
   day          date not null default current_date,
   kind         text not null check (kind in ('workout','nutrition','hydration','bonus')),
-  detail       text,          -- 'clean' | 'fast' for nutrition; litre count for hydration; note for bonus
+  detail       text,          -- workout: session count 1-3 | nutrition: 'clean'|'fast'
+                              -- hydration: litres | bonus: week_no
   points       int  not null default 0,
-  photo_url    text,          -- proof photo (workouts)
+  photo_url    text,          -- unused: OTC runs on the honour system, no proof required
   created_at   timestamptz not null default now()
 );
 create index if not exists entries_challenge_user_idx on public.entries(challenge_id, user_id);
 
--- one nutrition row and one hydration row per user per day
+-- exactly one row per kind, per user, per day (sessions/litres live in `detail`)
+create unique index if not exists entries_one_workout_per_day
+  on public.entries(challenge_id, user_id, day) where (kind = 'workout');
 create unique index if not exists entries_one_nutrition_per_day
   on public.entries(challenge_id, user_id, day) where (kind = 'nutrition');
 create unique index if not exists entries_one_hydration_per_day
   on public.entries(challenge_id, user_id, day) where (kind = 'hydration');
+create unique index if not exists entries_one_bonus_per_day
+  on public.entries(challenge_id, user_id, day) where (kind = 'bonus');
 
 -- Weekly bonus challenge posted by the owner
 create table if not exists public.bonus_challenges (

@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { startOfWeekYMD, addDays } from "@/lib/scoring";
-import type { Challenge, NutritionState } from "@/lib/types";
+import { weekNumberYMD, canLogDay } from "@/lib/scoring";
+import { EX_MAX, type Challenge, type NutritionState } from "@/lib/types";
 
 async function ctx(challengeId: string) {
   const supabase = createClient();
@@ -14,59 +14,63 @@ async function ctx(challengeId: string) {
   return { supabase, user, challenge: challenge as Challenge };
 }
 
-export async function logWorkout(challengeId: string, day: string, photoUrl: string | null) {
+/** Replace the single row of `kind` for that day (or clear it). */
+async function setDayEntry(
+  challengeId: string,
+  kind: "workout" | "nutrition" | "hydration" | "bonus",
+  day: string,
+  detail: string | null,
+  points: number
+) {
   const { supabase, user, challenge } = await ctx(challengeId);
 
-  // enforce optional bonus cap (max scoring workouts per week)
-  let points = challenge.pt_workout;
-  if (challenge.bonus_cap && challenge.bonus_cap > 0) {
-    const ws = startOfWeekYMD(day);
-    const we = addDays(ws, 6);
-    const { count } = await supabase
-      .from("entries")
-      .select("id", { count: "exact", head: true })
-      .eq("challenge_id", challengeId).eq("user_id", user.id).eq("kind", "workout")
-      .gte("day", ws).lte("day", we);
-    const maxScoring = 5 + challenge.bonus_cap;
-    if ((count ?? 0) >= maxScoring) points = 0; // logged but no longer scores
+  // Server-side guard: no logging before the start, after the end, or once the
+  // cut-off time has passed. Without this the closing time is only decoration.
+  if (!canLogDay(challenge, day)) {
+    throw new Error("Logging is closed for that day.");
   }
 
-  await supabase.from("entries").insert({
-    challenge_id: challengeId, user_id: user.id, day, kind: "workout",
-    points, photo_url: photoUrl,
-  });
+  await supabase.from("entries").delete()
+    .eq("challenge_id", challengeId).eq("user_id", user.id).eq("kind", kind).eq("day", day);
+  if (detail !== null) {
+    await supabase.from("entries").insert({
+      challenge_id: challengeId, user_id: user.id, day, kind, detail, points,
+    });
+  }
   revalidatePath(`/c/${challengeId}/checkin`);
 }
 
-export async function removeWorkout(challengeId: string, entryId: string) {
-  const { supabase } = await ctx(challengeId);
-  await supabase.from("entries").delete().eq("id", entryId);
-  revalidatePath(`/c/${challengeId}/checkin`);
+/** Exercise: 0–3 sessions in a day, `pt_workout` each. 0 clears the day. */
+export async function setWorkouts(challengeId: string, day: string, sessions: number) {
+  const { challenge } = await ctx(challengeId);
+  const n = Math.max(0, Math.min(EX_MAX, Math.round(sessions)));
+  await setDayEntry(challengeId, "workout", day, n === 0 ? null : String(n), n * challenge.pt_workout);
 }
 
 export async function setNutrition(challengeId: string, day: string, state: NutritionState | null) {
-  const { supabase, user, challenge } = await ctx(challengeId);
-  // one nutrition row per day: clear then set
-  await supabase.from("entries").delete()
-    .eq("challenge_id", challengeId).eq("user_id", user.id).eq("kind", "nutrition").eq("day", day);
-  if (state) {
-    const points = state === "fast" ? challenge.pt_fast : challenge.pt_clean;
-    await supabase.from("entries").insert({
-      challenge_id: challengeId, user_id: user.id, day, kind: "nutrition", detail: state, points,
-    });
-  }
-  revalidatePath(`/c/${challengeId}/checkin`);
+  const { challenge } = await ctx(challengeId);
+  const points = state === "fast" ? challenge.pt_fast : state === "clean" ? challenge.pt_clean : 0;
+  await setDayEntry(challengeId, "nutrition", day, state, points);
 }
 
 export async function setHydration(challengeId: string, day: string, litres: number) {
-  const { supabase, user, challenge } = await ctx(challengeId);
-  await supabase.from("entries").delete()
-    .eq("challenge_id", challengeId).eq("user_id", user.id).eq("kind", "hydration").eq("day", day);
-  if (litres > 0) {
-    await supabase.from("entries").insert({
-      challenge_id: challengeId, user_id: user.id, day, kind: "hydration",
-      detail: String(litres), points: litres * challenge.pt_litre,
-    });
+  const { challenge } = await ctx(challengeId);
+  const l = Math.max(0, Math.round(litres));
+  await setDayEntry(challengeId, "hydration", day, l === 0 ? null : String(l), l * challenge.pt_litre);
+}
+
+/** Weekly bonus: tick a day off. Points come from that week's bonus challenge. */
+export async function setBonus(challengeId: string, day: string, on: boolean) {
+  const { supabase, challenge } = await ctx(challengeId);
+  const week = weekNumberYMD(challenge.start_date, day);
+  const { data: bonus } = await supabase
+    .from("bonus_challenges").select("points, title")
+    .eq("challenge_id", challengeId).eq("week_no", week).maybeSingle();
+
+  // no challenge set for this week -> nothing to score
+  if (!bonus?.title) {
+    await setDayEntry(challengeId, "bonus", day, null, 0);
+    return;
   }
-  revalidatePath(`/c/${challengeId}/checkin`);
+  await setDayEntry(challengeId, "bonus", day, on ? String(week) : null, on ? bonus.points : 0);
 }

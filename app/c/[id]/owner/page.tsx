@@ -1,10 +1,13 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Challenge, Membership, BonusChallenge } from "@/lib/types";
-import { updateSettings, postBonus, deleteChallenge } from "./actions";
+import { todayYMD, weekNumberYMD, endYMD, prettyTime } from "@/lib/scoring";
+import { updateSettings, saveBonuses, deleteChallenge } from "./actions";
 import InviteBox from "./InviteBox";
 import RosterRow from "./RosterRow";
-import BonusRow from "./BonusRow";
+import ResetScores from "./ResetScores";
+
+export const dynamic = "force-dynamic";
 
 export default async function OwnerPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -17,18 +20,22 @@ export default async function OwnerPage({ params }: { params: { id: string } }) 
     .from("memberships").select("role").eq("challenge_id", params.id).eq("user_id", user!.id).maybeSingle();
   if (myMem?.role !== "owner") redirect(`/c/${params.id}`);
 
-  const { data: members } = await supabase
-    .from("memberships").select("user_id, role, profiles(display_name)").eq("challenge_id", params.id);
-  const { data: bonuses } = await supabase
-    .from("bonus_challenges").select("*").eq("challenge_id", params.id).order("week_no");
+  const [{ data: members }, { data: bonuses }] = await Promise.all([
+    supabase.from("memberships").select("user_id, role, profiles(display_name)").eq("challenge_id", params.id),
+    supabase.from("bonus_challenges").select("*").eq("challenge_id", params.id).order("week_no"),
+  ]);
 
   const mem = (members ?? []) as unknown as Membership[];
   const bon = (bonuses ?? []) as BonusChallenge[];
+  const byWeek = new Map(bon.map((b) => [b.week_no, b]));
+
+  const tz = ch.timezone || "Africa/Johannesburg";
+  const curWeek = weekNumberYMD(ch.start_date, todayYMD(tz));
   const site = process.env.NEXT_PUBLIC_SITE_URL || "";
   const inviteUrl = `${site}/join/${ch.invite_token}`;
 
   const save = updateSettings.bind(null, params.id);
-  const addBonus = postBonus.bind(null, params.id);
+  const saveBonus = saveBonuses.bind(null, params.id);
   const removeChallenge = deleteChallenge.bind(null, params.id);
 
   return (
@@ -51,21 +58,63 @@ export default async function OwnerPage({ params }: { params: { id: string } }) 
         ))}
       </div>
 
+      {/* ---------- Weekly bonus challenge ---------- */}
+      <h3 className="sec">Weekly bonus challenge</h3>
+      <form action={saveBonus}>
+        <div className="card">
+          {Array.from({ length: ch.weeks }, (_, i) => {
+            const w = i + 1;
+            const b = byWeek.get(w);
+            return (
+              <div key={w} className={`wkrow${w === curWeek ? " cur" : ""}`}>
+                <div className="wknum">{w}{w === curWeek && <small>NOW</small>}</div>
+                <input
+                  className="input desc"
+                  name={`title_${w}`}
+                  defaultValue={b?.title ?? ""}
+                  placeholder="No challenge set"
+                  maxLength={80}
+                />
+                <input
+                  className="input pts"
+                  name={`points_${w}`}
+                  type="number"
+                  min={0}
+                  defaultValue={b?.points ?? 2}
+                  aria-label={`Points for week ${w}`}
+                />
+              </div>
+            );
+          })}
+        </div>
+        <button className="btn mt14" type="submit">Save weekly challenges</button>
+        <p className="note">
+          Set a different challenge and point value for <b>every week</b> (e.g. &quot;10,000 steps a day&quot;).
+          Leave a week blank for no bonus. Points are earned <b>per day</b> a player ticks it off, and the
+          current week shows up on everyone&apos;s Check-in and Rules tabs.
+        </p>
+      </form>
+
+      {/* ---------- Settings ---------- */}
       <h3 className="sec">Challenge settings</h3>
       <div className="card" style={{ padding: 18 }}>
         <form action={save}>
           <label className="fld">Name</label>
           <input className="input" name="name" defaultValue={ch.name} />
+
           <div style={{ display: "flex", gap: 12 }}>
-            <div style={{ flex: 1.4 }}>
+            <div style={{ flex: 1 }}>
               <label className="fld">Start date</label>
               <input className="input" name="start_date" type="date" defaultValue={ch.start_date} />
             </div>
             <div style={{ flex: 1 }}>
-              <label className="fld">Weeks</label>
-              <input className="input" name="weeks" type="number" min={1} defaultValue={ch.weeks} />
+              <label className="fld">End date</label>
+              <input className="input" name="end_date" type="date" defaultValue={endYMD(ch)} />
             </div>
           </div>
+          <label className="fld">Logging closes at <span className="dim">(a fixed cut-off avoids a midnight scramble)</span></label>
+          <input className="input" name="end_time" type="time" defaultValue={prettyTime(ch.end_time)} />
+
           <div style={{ display: "flex", gap: 12 }}>
             <div style={{ flex: 1 }}>
               <label className="fld">Buy-in</label>
@@ -77,47 +126,30 @@ export default async function OwnerPage({ params }: { params: { id: string } }) 
             </div>
           </div>
           <label className="fld">Timezone <span className="dim">(sets the daily / weekly cut-off for everyone)</span></label>
-          <input className="input" name="timezone" defaultValue={ch.timezone || "Africa/Johannesburg"} placeholder="Africa/Johannesburg" />
+          <input className="input" name="timezone" defaultValue={tz} placeholder="Africa/Johannesburg" />
 
           <h3 className="sec" style={{ marginBottom: 6 }}>Scoring</h3>
           <div style={{ display: "flex", gap: 12 }}>
-            <div style={{ flex: 1 }}><label className="fld">Workout</label><input className="input" name="pt_workout" type="number" min={0} defaultValue={ch.pt_workout} /></div>
+            <div style={{ flex: 1 }}><label className="fld">Exercise session</label><input className="input" name="pt_workout" type="number" min={0} defaultValue={ch.pt_workout} /></div>
             <div style={{ flex: 1 }}><label className="fld">Clean day</label><input className="input" name="pt_clean" type="number" min={0} defaultValue={ch.pt_clean} /></div>
           </div>
           <div style={{ display: "flex", gap: 12 }}>
             <div style={{ flex: 1 }}><label className="fld">Full fast</label><input className="input" name="pt_fast" type="number" min={0} defaultValue={ch.pt_fast} /></div>
             <div style={{ flex: 1 }}><label className="fld">Per litre</label><input className="input" name="pt_litre" type="number" min={0} defaultValue={ch.pt_litre} /></div>
           </div>
-          <label className="fld">Bonus workout cap <span className="dim">(extra scoring workouts/week beyond 5 — 0 = unlimited)</span></label>
-          <input className="input" name="bonus_cap" type="number" min={0} defaultValue={ch.bonus_cap} />
+
           <button className="btn mt20" type="submit">Save settings</button>
-          <p className="note">Scoring changes apply to entries logged <b>after</b> you save.</p>
+          <p className="note">
+            These values drive the <b>Rules tab</b> — everyone sees the change straight away. Points already
+            banked keep the value they were earned at.
+          </p>
         </form>
       </div>
 
-      <h3 className="sec">Weekly bonus challenge</h3>
+      {/* ---------- Danger zone ---------- */}
+      <h3 className="sec">Reset</h3>
       <div className="card" style={{ padding: 18 }}>
-        {bon.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            {bon.map((b) => <BonusRow key={b.id} challengeId={params.id} bonus={b} />)}
-          </div>
-        )}
-        <form action={addBonus}>
-          <div style={{ display: "flex", gap: 12 }}>
-            <div style={{ width: 90 }}>
-              <label className="fld">Week</label>
-              <input className="input" name="week_no" type="number" min={1} max={ch.weeks} defaultValue={1} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label className="fld">Points</label>
-              <input className="input" name="points" type="number" min={0} defaultValue={10} />
-            </div>
-          </div>
-          <label className="fld">Challenge</label>
-          <input className="input" name="title" placeholder="e.g. 10,000 steps every day" />
-          <button className="btn ghost mt14" type="submit">Post bonus challenge</button>
-          <p className="note">Posting for a week that already has one will replace it.</p>
-        </form>
+        <ResetScores challengeId={params.id} />
       </div>
 
       <h3 className="sec" style={{ color: "#ff6b6b" }}>Danger zone</h3>

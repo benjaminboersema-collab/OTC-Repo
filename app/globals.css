@@ -147,3 +147,61 @@ nav.tabbar .inner{max-width:480px;margin:0 auto;width:100%;display:flex;}
 .muted{color:var(--muted)} .dim{color:var(--dim)}
 .row-between{display:flex;justify-content:space-between;align-items:center;gap:12px;}
 .mt8{margin-top:8px}.mt14{margin-top:14px}.mt20{margin-top:20px}
+
+/* Exercise + weekly-bonus day cells */
+.day.exon{background:linear-gradient(135deg,var(--brand-dim),var(--brand));border-color:var(--brand)}
+.day.exon .dn,.day.exon .dp{color:#08120b} .day.exon .dc{opacity:1}
+.day.bon{background:linear-gradient(135deg,#b98a1e,var(--gold));border-color:var(--gold)}
+.day.bon .dn,.day.bon .dp{color:#241a02} .day.bon .dc{opacity:1}
+.day.exon .dp,.day.bon .dp{opacity:1;height:auto}
+
+/* Days outside the challenge window / after the cut-off */
+.day.locked,.hcell.locked{opacity:.32;cursor:not-allowed;filter:grayscale(.6)}
+.day.locked:active,.hcell.locked:active{transform:none}
+
+/* "?" rule reminders */
+.qbtn{margin-left:8px;width:18px;height:18px;border-radius:50%;border:1px solid var(--line);
+  background:var(--surface2);color:var(--muted);font-size:11px;font-weight:800;display:inline-flex;
+  align-items:center;justify-content:center;cursor:pointer;vertical-align:middle;padding:0}
+.ruleinfo{display:none;background:var(--surface2);border:1px solid var(--line);border-radius:10px;
+  padding:11px 13px;margin:11px 0 2px;font-size:12px;color:var(--muted);line-height:1.55}
+.ruleinfo.show{display:block}
+.ruleinfo b{color:var(--text)}
+
+/* Rules page */
+.rule{display:flex;align-items:center;gap:13px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.rule:last-child{border-bottom:none}
+.rico{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+  font-size:19px;flex-shrink:0;background:var(--surface2)}
+.rinfo{flex:1;min-width:0}
+.rinfo .rt{font-weight:700;font-size:15px}
+.rinfo .rd{font-size:12px;color:var(--dim);margin-top:2px}
+.rp{text-align:right;font-weight:800;font-size:20px;color:var(--brand);flex-shrink:0;
+  display:flex;flex-direction:column;line-height:1.05}
+.rp span{font-size:10px;color:var(--dim);font-weight:600}
+.rp.fast{color:var(--fast)} .rp.accent{color:var(--accent)}
+.def{padding:15px 18px;border-top:1px solid var(--line)}
+.def:first-child{border-top:none}
+.def .dt{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
+.def .dt .pill{margin-left:auto;font-size:11px;font-weight:800;padding:2px 9px;border-radius:20px;
+  background:rgba(49,208,122,.15);color:var(--brand)}
+.def .dt .pill.fast{background:rgba(201,138,255,.15);color:var(--fast)}
+.def .dt .pill.accent{background:rgba(74,168,255,.15);color:var(--accent)}
+.def p{font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.55}
+.def p b{color:var(--text)}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.xchip{font-size:11px;font-weight:600;padding:5px 10px;border-radius:8px;
+  background:rgba(242,100,90,.12);color:#f2938c;border:1px solid rgba(242,100,90,.25)}
+.ychip{font-size:11px;font-weight:600;padding:5px 10px;border-radius:8px;
+  background:rgba(49,208,122,.12);color:var(--brand);border:1px solid rgba(49,208,122,.25)}
+
+/* Owner: weekly bonus editor */
+.wkrow{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line)}
+.wkrow:last-child{border-bottom:none}
+.wkrow.cur{background:linear-gradient(90deg,rgba(255,207,77,.09),transparent)}
+.wknum{width:34px;flex-shrink:0;font-size:11px;font-weight:800;color:var(--dim);text-align:center;line-height:1.2}
+.wkrow.cur .wknum{color:var(--gold)}
+.wknum small{display:block;font-size:8px;font-weight:700;letter-spacing:.3px}
+.wkrow .input{margin-top:0;padding:10px 12px;font-size:14px}
+.wkrow .input.desc{flex:1;min-width:0}
+.wkrow .input.pts{width:64px;flex-shrink:0;text-align:center;font-weight:700}

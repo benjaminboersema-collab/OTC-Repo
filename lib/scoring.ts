@@ -47,6 +47,60 @@ export function weekNumberYMD(startDate: string, dateYMD: string): number {
   return Math.floor((d - s) / (7 * 86_400_000)) + 1;
 }
 
+/** The challenge's last day — explicit end_date if set, else derived from weeks. */
+export function endYMD(c: { start_date: string; weeks: number; end_date?: string | null }): string {
+  return c.end_date || addDays(c.start_date, c.weeks * 7 - 1);
+}
+
+/** How many weeks the challenge actually spans (start → end, inclusive). */
+export function totalWeeks(c: { start_date: string; weeks: number; end_date?: string | null }): number {
+  if (!c.end_date) return c.weeks;
+  const s = noonUTC(startOfWeekYMD(c.start_date)).getTime();
+  const e = noonUTC(startOfWeekYMD(c.end_date)).getTime();
+  return Math.max(1, Math.round((e - s) / (7 * 86_400_000)) + 1);
+}
+
+/** "9 Oct 2026" — for display. */
+export function prettyDate(ymd: string, withYear = true): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m - 1];
+  return withYear ? `${d} ${M} ${y}` : `${d} ${M}`;
+}
+
+/** "18:00:00" -> "18:00" */
+export function prettyTime(t: string): string {
+  return (t || "18:00").slice(0, 5);
+}
+
+/** Current wall-clock "HH:MM" in the challenge's timezone. */
+export function nowHM(timeZone: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone, hour: "2-digit", minute: "2-digit", hour12: false,
+  }).format(new Date());
+}
+
+type Window = {
+  start_date: string; weeks: number; end_date?: string | null;
+  end_time?: string; timezone?: string;
+};
+
+/** Has the challenge finished? (past the end date, or past the cut-off on the last day) */
+export function isClosed(c: Window): boolean {
+  const tz = c.timezone || "Africa/Johannesburg";
+  const today = todayYMD(tz);
+  const end = endYMD(c);
+  if (today > end) return true;
+  if (today < end) return false;
+  return nowHM(tz) >= prettyTime(c.end_time || "18:00");
+}
+
+/** Is this civil date inside the challenge window (and still loggable)? */
+export function canLogDay(c: Window, day: string): boolean {
+  if (day < c.start_date) return false;      // before the starting gun
+  if (day > endYMD(c)) return false;         // after the finish
+  return !isClosed(c);                       // logging has closed for everyone
+}
+
 /** ---------- Scoring ---------- */
 export function totalPoints(entries: Entry[]): number {
   return entries.reduce((sum, e) => sum + e.points, 0);

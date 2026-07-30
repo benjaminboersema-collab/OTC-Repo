@@ -67,7 +67,7 @@ export default async function LeaderboardPage({ params }: { params: { id: string
             );
           })}
         </div>
-        <p className="note"><b>Every workout carries a proof photo 📷</b> the whole team can see. Points have no ceiling — extra workouts and litres of water keep stacking.</p>
+        <p className="note"><b>Nothing is mandatory</b> — do as much or as little as you like. Whoever has the most points when logging closes wins. OTC runs on the honour system — be honest.</p>
       </main>
     </>
   );

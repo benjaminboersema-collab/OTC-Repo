@@ -28,7 +28,10 @@ export default async function ProgressPage({ params }: { params: { id: string } 
   const days = weekDaysYMD(today);
   const thisWeek = mine.filter((e) => e.day >= days[0] && e.day <= days[6]);
   const b = breakdown(thisWeek);
-  const workoutsLogged = mine.filter((e) => e.kind === "workout").length;
+  // exercise rows store the session count in `detail`
+  const sessionsLogged = mine
+    .filter((e) => e.kind === "workout")
+    .reduce((a, e) => a + Number(e.detail ?? 1), 0);
   const streak = nutritionStreak(mine);
 
   // points by week bars
@@ -52,7 +55,7 @@ export default async function ProgressPage({ params }: { params: { id: string } 
         <div className="stat-grid">
           <div className="stat"><div className="v brand">{myTotal}</div><div className="k">Total points</div></div>
           <div className="stat"><div className="v warn">{streak}<small> days</small></div><div className="k">Nutrition streak</div></div>
-          <div className="stat"><div className="v accent">{workoutsLogged}</div><div className="k">Workouts logged</div></div>
+          <div className="stat"><div className="v accent">{sessionsLogged}</div><div className="k">Sessions logged</div></div>
           <div className="stat pot"><div className="v">{rank === 1 ? "Leader 👑" : `${gap} pts`}</div><div className="k">Behind the leader</div></div>
         </div>
 
@@ -80,7 +83,8 @@ export default async function ProgressPage({ params }: { params: { id: string } 
           <div className="stat"><div className="v brand">{b.workout}</div><div className="k">🏃 Exercise</div></div>
           <div className="stat"><div className="v fast">{b.nutrition}</div><div className="k">🥗 Nutrition</div></div>
           <div className="stat"><div className="v accent">{b.hydration}</div><div className="k">💧 Hydration</div></div>
-          <div className="stat"><div className="v">{b.total}</div><div className="k">Week total</div></div>
+          <div className="stat"><div className="v" style={{ color: "var(--gold)" }}>{b.bonus}</div><div className="k">🎯 Weekly bonus</div></div>
+          <div className="stat" style={{ gridColumn: "1 / -1" }}><div className="v">{b.total}</div><div className="k">Week total</div></div>
         </div>
       </main>
     </>
