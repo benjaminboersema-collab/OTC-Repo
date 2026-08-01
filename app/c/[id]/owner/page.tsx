@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Challenge, Membership, BonusChallenge } from "@/lib/types";
+import type { Challenge, Membership, BonusChallenge, Entry } from "@/lib/types";
 import { todayYMD, weekNumberYMD, endYMD, prettyTime } from "@/lib/scoring";
-import { updateSettings, saveBonuses, deleteChallenge } from "./actions";
+import { updateSettings, saveBonuses, saveAdjustments, deleteChallenge } from "./actions";
 import InviteBox from "./InviteBox";
 import RosterRow from "./RosterRow";
 import ResetScores from "./ResetScores";
@@ -20,9 +20,10 @@ export default async function OwnerPage({ params }: { params: { id: string } }) 
     .from("memberships").select("role").eq("challenge_id", params.id).eq("user_id", user!.id).maybeSingle();
   if (myMem?.role !== "owner") redirect(`/c/${params.id}`);
 
-  const [{ data: members }, { data: bonuses }] = await Promise.all([
+  const [{ data: members }, { data: bonuses }, { data: entries }] = await Promise.all([
     supabase.from("memberships").select("user_id, role, cheerleader, profiles(display_name)").eq("challenge_id", params.id),
     supabase.from("bonus_challenges").select("*").eq("challenge_id", params.id).order("week_no"),
+    supabase.from("entries").select("user_id, kind, points").eq("challenge_id", params.id),
   ]);
 
   const mem = (members ?? []) as unknown as Membership[];
@@ -31,6 +32,15 @@ export default async function OwnerPage({ params }: { params: { id: string } }) 
   const bon = (bonuses ?? []) as BonusChallenge[];
   const byWeek = new Map(bon.map((b) => [b.week_no, b]));
 
+  // earned = everything they logged themselves; adj = the owner's manual correction
+  const ents = (entries ?? []) as Pick<Entry, "user_id" | "kind" | "points">[];
+  const earned = new Map<string, number>();
+  const adj = new Map<string, number>();
+  for (const e of ents) {
+    const bucket = e.kind === "adjustment" ? adj : earned;
+    bucket.set(e.user_id, (bucket.get(e.user_id) ?? 0) + e.points);
+  }
+
   const tz = ch.timezone || "Africa/Johannesburg";
   const curWeek = weekNumberYMD(ch.start_date, todayYMD(tz));
   const site = process.env.NEXT_PUBLIC_SITE_URL || "";
@@ -38,6 +48,7 @@ export default async function OwnerPage({ params }: { params: { id: string } }) 
 
   const save = updateSettings.bind(null, params.id);
   const saveBonus = saveBonuses.bind(null, params.id);
+  const saveAdj = saveAdjustments.bind(null, params.id);
   const removeChallenge = deleteChallenge.bind(null, params.id);
 
   return (
@@ -63,7 +74,7 @@ export default async function OwnerPage({ params }: { params: { id: string } }) 
         ))}
       </div>
 
-      <h3 className="sec">Cheerleading section 📣</h3>
+      <h3 className="sec">🎊 Cheerleading section 🎊</h3>
       <div className="card">
         {cheer.length === 0 ? (
           <div className="empty">
@@ -81,6 +92,42 @@ export default async function OwnerPage({ params }: { params: { id: string } }) 
           />
         ))}
       </div>
+
+      {/* ---------- Manual point adjustments ---------- */}
+      <h3 className="sec">Adjust points</h3>
+      <form action={saveAdj}>
+        <div className="card">
+          {mem.map((m) => {
+            const name = (m as any).profiles?.display_name ?? "Member";
+            const e = earned.get(m.user_id) ?? 0;
+            const a = adj.get(m.user_id) ?? 0;
+            return (
+              <div key={m.user_id} className="adjrow">
+                <div className="lb-info">
+                  <div className="nm">
+                    {name}
+                    {m.cheerleader && <span className="cheertag">CHEER</span>}
+                  </div>
+                  <div className="sub"><span>{e} logged · {e + a} total</span></div>
+                </div>
+                <input
+                  className="input adjinput"
+                  name={`adj_${m.user_id}`}
+                  type="number"
+                  step={1}
+                  defaultValue={a}
+                  aria-label={`Point adjustment for ${name}`}
+                />
+              </div>
+            );
+          })}
+        </div>
+        <button className="btn ghost mt14" type="submit">Save adjustments</button>
+        <p className="note">
+          Added on top of what the player logged themselves — use a minus sign to take points away.
+          Set it back to <b>0</b> to clear the adjustment. Their own logs are never touched.
+        </p>
+      </form>
 
       {/* ---------- Weekly bonus challenge ---------- */}
       <h3 className="sec">Weekly bonus challenge</h3>

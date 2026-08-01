@@ -1,5 +1,6 @@
 export type Role = "owner" | "member";
-export type EntryKind = "workout" | "nutrition" | "hydration" | "bonus";
+/** `adjustment` is owner-only: a manual correction to a player's total. */
+export type EntryKind = "workout" | "nutrition" | "hydration" | "bonus" | "adjustment";
 export type NutritionState = "clean" | "fast";
 
 export interface Challenge {

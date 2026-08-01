@@ -110,6 +110,61 @@ export async function saveBonuses(challengeId: string, formData: FormData) {
   revalidateAll(challengeId);
 }
 
+/**
+ * Manual point adjustments, one per player, positive or negative.
+ * Stored as a single `adjustment` entry per player dated on the challenge's
+ * start day, so it lands in the season total like any other entry. A value of
+ * 0 removes the row entirely rather than leaving a no-op sitting in the table.
+ */
+export async function saveAdjustments(challengeId: string, formData: FormData) {
+  const supabase = await assertOwner(challengeId);
+
+  const { data: ch } = await supabase
+    .from("challenges").select("start_date").eq("id", challengeId).single();
+  const day = (ch?.start_date as string) ?? new Date().toISOString().slice(0, 10);
+
+  const { data: members } = await supabase
+    .from("memberships").select("user_id").eq("challenge_id", challengeId);
+
+  // what's already stored, so we only touch the players whose value changed
+  const { data: existing } = await supabase
+    .from("entries").select("user_id, points")
+    .eq("challenge_id", challengeId).eq("kind", "adjustment");
+  const current = new Map(((existing ?? []) as { user_id: string; points: number }[])
+    .map((e) => [e.user_id, e.points]));
+
+  const inserts: { challenge_id: string; user_id: string; day: string; kind: string; detail: string; points: number }[] = [];
+  const clears: string[] = [];
+
+  for (const m of (members ?? []) as { user_id: string }[]) {
+    const raw = (formData.get(`adj_${m.user_id}`) as string) ?? "";
+    const parsed = parseInt(raw.trim(), 10);
+    const want = Number.isFinite(parsed) ? parsed : 0;
+    const have = current.get(m.user_id) ?? 0;
+    if (want === have) continue;                       // untouched — leave it alone
+    if (current.has(m.user_id)) clears.push(m.user_id); // replace: delete then insert
+    if (want !== 0) {
+      inserts.push({
+        challenge_id: challengeId, user_id: m.user_id, day,
+        kind: "adjustment", detail: "manual", points: want,
+      });
+    }
+  }
+
+  // Delete-then-insert rather than upsert: the uniqueness guard is a PARTIAL
+  // index (where kind = 'adjustment'), which PostgREST's on_conflict can't target.
+  if (clears.length) {
+    const { error } = await supabase.from("entries").delete()
+      .eq("challenge_id", challengeId).eq("kind", "adjustment").in("user_id", clears);
+    if (error) throw new Error(error.message);
+  }
+  if (inserts.length) {
+    const { error } = await supabase.from("entries").insert(inserts);
+    if (error) throw new Error(`Adjustments not saved: ${error.message}`);
+  }
+  revalidateAll(challengeId);
+}
+
 /** Wipe every logged entry — a clean slate before the challenge starts. */
 export async function resetAllScores(challengeId: string) {
   const supabase = await assertOwner(challengeId);

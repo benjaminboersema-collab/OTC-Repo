@@ -29,8 +29,8 @@ export default function RosterRow({
 
   return (
     <div className="lb-row">
-      <div className="av" style={{ background: cheerleader ? "var(--dim)" : color }}>
-        {cheerleader ? "📣" : name[0]?.toUpperCase()}
+      <div className={`av${cheerleader ? " cheer-av" : ""}`} style={cheerleader ? undefined : { background: color }}>
+        {cheerleader ? "🎊" : name[0]?.toUpperCase()}
       </div>
       <div className="lb-info">
         <div className="nm">

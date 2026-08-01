@@ -111,11 +111,12 @@ export interface SourceBreakdown {
   nutrition: number;
   hydration: number;
   bonus: number;
+  adjustment: number;
   total: number;
 }
 
 export function breakdown(entries: Entry[]): SourceBreakdown {
-  const b: SourceBreakdown = { workout: 0, nutrition: 0, hydration: 0, bonus: 0, total: 0 };
+  const b: SourceBreakdown = { workout: 0, nutrition: 0, hydration: 0, bonus: 0, adjustment: 0, total: 0 };
   for (const e of entries) {
     b[e.kind] += e.points;
     b.total += e.points;
@@ -132,6 +133,41 @@ export function leaderboard(entries: Entry[]): Map<string, number> {
   const m = new Map<string, number>();
   for (const e of entries) m.set(e.user_id, (m.get(e.user_id) ?? 0) + e.points);
   return m;
+}
+
+/** ---------- One player, one day (powers the tap-a-name popup) ---------- */
+type LogEntry = Pick<Entry, "day" | "kind" | "detail" | "points">;
+
+export interface DayLog {
+  workout: LogEntry | null;
+  nutrition: LogEntry | null;
+  hydration: LogEntry | null;
+  bonus: LogEntry | null;
+  total: number;
+  count: number;
+}
+
+/**
+ * What a player logged on one civil date.
+ * Owner adjustments are deliberately excluded: they belong to the season, not
+ * to the day they happen to be stored on.
+ */
+export function dayLog(entries: LogEntry[], day: string): DayLog {
+  const onDay = entries.filter((e) => e.day === day && e.kind !== "adjustment");
+  const of = (kind: string) => onDay.find((e) => e.kind === kind) ?? null;
+  return {
+    workout: of("workout"),
+    nutrition: of("nutrition"),
+    hydration: of("hydration"),
+    bonus: of("bonus"),
+    total: onDay.reduce((s, e) => s + e.points, 0),
+    count: onDay.length,
+  };
+}
+
+/** The owner's manual correction to a player's season total (may be negative). */
+export function adjustmentTotal(entries: Pick<Entry, "kind" | "points">[]): number {
+  return entries.filter((e) => e.kind === "adjustment").reduce((s, e) => s + e.points, 0);
 }
 
 /** Consecutive nutrition days (clean or fast) ending at the latest logged day */

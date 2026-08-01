@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Challenge, Entry, Membership } from "@/lib/types";
-import { leaderboard, nutritionStreak } from "@/lib/scoring";
+import { leaderboard, nutritionStreak, endYMD, todayYMD } from "@/lib/scoring";
+import PlayerPeek, { type PeekEntry } from "./PlayerPeek";
 
 export default async function LeaderboardPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -20,6 +21,10 @@ export default async function LeaderboardPage({ params }: { params: { id: string
   const scores = leaderboard(ents);
   const colors = ["#31d07a", "#4aa8ff", "#f2b04a", "#c98aff", "#f2645a", "#5ad1c9"];
 
+  const tz = ch.timezone || "Africa/Johannesburg";
+  const today = todayYMD(tz);
+  const end = endYMD(ch);
+
   const toRow = (m: Membership) => {
     const userEntries = ents.filter((e) => e.user_id === m.user_id);
     return {
@@ -30,6 +35,8 @@ export default async function LeaderboardPage({ params }: { params: { id: string
       streak: nutritionStreak(userEntries),
       me: m.user_id === user?.id,
       ci: Math.max(0, mem.findIndex((x) => x.user_id === m.user_id)) % colors.length,
+      // only what the popup needs — keeps the client payload small
+      peek: userEntries.map((e): PeekEntry => ({ day: e.day, kind: e.kind, detail: e.detail, points: e.points })),
     };
   };
 
@@ -39,6 +46,16 @@ export default async function LeaderboardPage({ params }: { params: { id: string
 
   // cheerleaders neither pay in nor play for the pot
   const pot = ch.buyin_amount * rows.length;
+
+  const nameBlock = (r: ReturnType<typeof toRow>) => (
+    <PlayerPeek name={r.name} entries={r.peek} startDate={ch.start_date} endDate={end} today={today}>
+      <span className="nm">
+        {r.name}
+        {r.me && <span className="youtag">YOU</span>}
+        {r.role === "owner" && <span className="ownertag">OWNER</span>}
+      </span>
+    </PlayerPeek>
+  );
 
   return (
     <>
@@ -50,7 +67,7 @@ export default async function LeaderboardPage({ params }: { params: { id: string
         </div>
         <div className="banner-sub">
           {ch.weeks} weeks · starts {ch.start_date} · most points wins
-          {cheerRows.length > 0 && ` · ${cheerRows.length} cheering 📣`}
+          {cheerRows.length > 0 && ` · ${cheerRows.length} cheering 🎊`}
         </div>
       </div>
 
@@ -66,7 +83,7 @@ export default async function LeaderboardPage({ params }: { params: { id: string
                 <div className={`rank${rank <= 3 ? " g" + rank : ""}`}>{rank}</div>
                 <div className="av" style={{ background: colors[r.ci] }}>{r.name[0]?.toUpperCase()}</div>
                 <div className="lb-info">
-                  <div className="nm">{r.name}{r.me && <span className="youtag">YOU</span>}{r.role === "owner" && <span className="ownertag">OWNER</span>}</div>
+                  {nameBlock(r)}
                   <div className="sub">{r.streak > 0 ? <span className="streak">🔥 {r.streak}d clean</span> : <span>—</span>}</div>
                 </div>
                 <div className="lb-score"><div className="pts">{r.points}</div><div className="of">pts</div></div>
@@ -74,17 +91,18 @@ export default async function LeaderboardPage({ params }: { params: { id: string
             );
           })}
         </div>
+        <p className="note">Tap a name to see what they logged on any given day.</p>
 
         {cheerRows.length > 0 && (
           <>
-            <h3 className="sec">Cheerleading section 📣</h3>
+            <h3 className="sec cheer-sec">🎊 Cheerleading section 🎊</h3>
             <div className="card cheer">
               {cheerRows.map((r) => (
                 <div key={r.user_id} className={`lb-row cheer-row${r.me ? " me" : ""}`}>
-                  <div className="rank cheer-rank">📣</div>
-                  <div className="av" style={{ background: colors[r.ci] }}>{r.name[0]?.toUpperCase()}</div>
+                  <div className="rank cheer-rank">🎊</div>
+                  <div className="av cheer-av">{r.name[0]?.toUpperCase()}</div>
                   <div className="lb-info">
-                    <div className="nm">{r.name}{r.me && <span className="youtag">YOU</span>}{r.role === "owner" && <span className="ownertag">OWNER</span>}</div>
+                    {nameBlock(r)}
                     <div className="sub">{r.streak > 0 ? <span className="streak">🔥 {r.streak}d clean</span> : <span>—</span>}</div>
                   </div>
                   <div className="lb-score"><div className="pts">{r.points}</div><div className="of">pts</div></div>
@@ -93,7 +111,7 @@ export default async function LeaderboardPage({ params }: { params: { id: string
             </div>
             <p className="note">
               Cheerleaders are part of the team but not the contest — they log their own points and
-              keep their streaks, they just don't take a rank and don't play for the pot.
+              keep their streaks, they just don&apos;t take a rank and don&apos;t play for the pot.
             </p>
           </>
         )}

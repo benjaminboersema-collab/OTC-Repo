@@ -53,7 +53,7 @@ export default async function ProgressPage({ params }: { params: { id: string } 
   return (
     <>
       <div className="banner">
-        <div className="row"><h2>Your progress</h2><span className="wk">{iCheer ? "Cheerleader 📣" : rank > 0 ? `Rank ${rank} of ${competing.size}` : "—"}</span></div>
+        <div className="row"><h2>Your progress</h2><span className="wk">{iCheer ? "Cheerleader 🎊" : rank > 0 ? `Rank ${rank} of ${competing.size}` : "—"}</span></div>
         <div className="track"><div className="fill" style={{ width: `${leaderPts ? Math.min(100, (myTotal / leaderPts) * 100) : 0}%` }} /></div>
         <div className="meta"><span>Season total</span><span><b>{myTotal}</b> pts{iCheer ? " · not competing" : ` · leader ${leaderPts}`}</span></div>
       </div>
@@ -64,7 +64,7 @@ export default async function ProgressPage({ params }: { params: { id: string } 
           <div className="stat"><div className="v warn">{streak}<small> days</small></div><div className="k">Nutrition streak</div></div>
           <div className="stat"><div className="v accent">{sessionsLogged}</div><div className="k">Sessions logged</div></div>
           <div className="stat pot">
-            <div className="v">{iCheer ? "📣" : rank === 1 ? "Leader 👑" : `${gap} pts`}</div>
+            <div className="v">{iCheer ? "🎊" : rank === 1 ? "Leader 👑" : `${gap} pts`}</div>
             <div className="k">{iCheer ? "Cheering, not competing" : "Behind the leader"}</div>
           </div>
         </div>
@@ -94,6 +94,12 @@ export default async function ProgressPage({ params }: { params: { id: string } 
           <div className="stat"><div className="v fast">{b.nutrition}</div><div className="k">🥗 Nutrition</div></div>
           <div className="stat"><div className="v accent">{b.hydration}</div><div className="k">💧 Hydration</div></div>
           <div className="stat"><div className="v" style={{ color: "var(--gold)" }}>{b.bonus}</div><div className="k">🎯 Weekly bonus</div></div>
+          {b.adjustment !== 0 && (
+            <div className="stat" style={{ gridColumn: "1 / -1" }}>
+              <div className="v">{b.adjustment > 0 ? `+${b.adjustment}` : b.adjustment}</div>
+              <div className="k">⚖️ Owner adjustment</div>
+            </div>
+          )}
           <div className="stat" style={{ gridColumn: "1 / -1" }}><div className="v">{b.total}</div><div className="k">Week total</div></div>
         </div>
       </main>

@@ -58,7 +58,7 @@ create table if not exists public.entries (
   challenge_id uuid not null references public.challenges(id) on delete cascade,
   user_id      uuid not null references public.profiles(id) on delete cascade,
   day          date not null default current_date,
-  kind         text not null check (kind in ('workout','nutrition','hydration','bonus')),
+  kind         text not null check (kind in ('workout','nutrition','hydration','bonus','adjustment')),
   detail       text,          -- workout: session count 1-3 | nutrition: 'clean'|'fast'
                               -- hydration: litres | bonus: week_no
   points       int  not null default 0,
@@ -76,6 +76,9 @@ create unique index if not exists entries_one_hydration_per_day
   on public.entries(challenge_id, user_id, day) where (kind = 'hydration');
 create unique index if not exists entries_one_bonus_per_day
   on public.entries(challenge_id, user_id, day) where (kind = 'bonus');
+-- ...and exactly one owner adjustment per player per challenge
+create unique index if not exists entries_one_adjustment_per_user
+  on public.entries(challenge_id, user_id) where (kind = 'adjustment');
 
 -- Weekly bonus challenge posted by the owner
 create table if not exists public.bonus_challenges (
@@ -199,12 +202,29 @@ create policy memberships_update on public.memberships
 -- entries
 drop policy if exists entries_select on public.entries;
 create policy entries_select on public.entries for select using (is_member(challenge_id));
+-- members write their own entries — but NEVER an adjustment row, otherwise a
+-- member could award themselves arbitrary points
 drop policy if exists entries_write on public.entries;
-create policy entries_write on public.entries for insert with check (user_id = auth.uid() and is_member(challenge_id));
+create policy entries_write on public.entries for insert
+  with check (user_id = auth.uid() and is_member(challenge_id) and kind <> 'adjustment');
 drop policy if exists entries_update on public.entries;
-create policy entries_update on public.entries for update using (user_id = auth.uid());
+create policy entries_update on public.entries for update
+  using (user_id = auth.uid() and kind <> 'adjustment');
 drop policy if exists entries_delete on public.entries;
-create policy entries_delete on public.entries for delete using (user_id = auth.uid());
+create policy entries_delete on public.entries for delete
+  using (user_id = auth.uid() and kind <> 'adjustment');
+
+-- the owner may write adjustments for anyone in their challenge, and only those
+drop policy if exists entries_owner_adjust_insert on public.entries;
+create policy entries_owner_adjust_insert on public.entries for insert
+  with check (kind = 'adjustment' and is_owner(challenge_id));
+drop policy if exists entries_owner_adjust_update on public.entries;
+create policy entries_owner_adjust_update on public.entries for update
+  using (kind = 'adjustment' and is_owner(challenge_id))
+  with check (kind = 'adjustment' and is_owner(challenge_id));
+drop policy if exists entries_owner_adjust_delete on public.entries;
+create policy entries_owner_adjust_delete on public.entries for delete
+  using (kind = 'adjustment' and is_owner(challenge_id));
 
 -- bonus challenges
 drop policy if exists bonus_select on public.bonus_challenges;
