@@ -9,7 +9,7 @@ export default async function LeaderboardPage({ params }: { params: { id: string
   const { data: challenge } = await supabase
     .from("challenges").select("*").eq("id", params.id).single();
   const { data: members } = await supabase
-    .from("memberships").select("user_id, role, profiles(id, display_name)").eq("challenge_id", params.id);
+    .from("memberships").select("user_id, role, cheerleader, profiles(id, display_name)").eq("challenge_id", params.id);
   const { data: entries } = await supabase
     .from("entries").select("*").eq("challenge_id", params.id);
 
@@ -18,46 +18,53 @@ export default async function LeaderboardPage({ params }: { params: { id: string
   const ents = (entries ?? []) as Entry[];
 
   const scores = leaderboard(ents);
-  const rows = mem
-    .map((m) => {
-      const userEntries = ents.filter((e) => e.user_id === m.user_id);
-      return {
-        user_id: m.user_id,
-        name: (m as any).profiles?.display_name ?? "Member",
-        role: m.role,
-        points: scores.get(m.user_id) ?? 0,
-        streak: nutritionStreak(userEntries),
-        me: m.user_id === user?.id,
-      };
-    })
-    .sort((a, b) => b.points - a.points);
-
-  const pot = ch.buyin_amount * mem.length;
   const colors = ["#31d07a", "#4aa8ff", "#f2b04a", "#c98aff", "#f2645a", "#5ad1c9"];
+
+  const toRow = (m: Membership) => {
+    const userEntries = ents.filter((e) => e.user_id === m.user_id);
+    return {
+      user_id: m.user_id,
+      name: (m as any).profiles?.display_name ?? "Member",
+      role: m.role,
+      points: scores.get(m.user_id) ?? 0,
+      streak: nutritionStreak(userEntries),
+      me: m.user_id === user?.id,
+      ci: Math.max(0, mem.findIndex((x) => x.user_id === m.user_id)) % colors.length,
+    };
+  };
+
+  const byPoints = (a: { points: number }, b: { points: number }) => b.points - a.points;
+  const rows = mem.filter((m) => !m.cheerleader).map(toRow).sort(byPoints);
+  const cheerRows = mem.filter((m) => m.cheerleader).map(toRow).sort(byPoints);
+
+  // cheerleaders neither pay in nor play for the pot
+  const pot = ch.buyin_amount * rows.length;
 
   return (
     <>
       <div className="banner">
         <div className="row"><h2>The Pot</h2><span className="wk">Winner takes all</span></div>
         <div className="meta" style={{ marginTop: 8 }}>
-          <span>{mem.length} player{mem.length !== 1 ? "s" : ""} · {ch.currency} {ch.buyin_amount.toLocaleString()} each</span>
+          <span>{rows.length} player{rows.length !== 1 ? "s" : ""} · {ch.currency} {ch.buyin_amount.toLocaleString()} each</span>
           <b style={{ color: "var(--gold)", fontSize: 18 }}>{ch.currency} {pot.toLocaleString()}</b>
         </div>
-        <div className="banner-sub">{ch.weeks} weeks · starts {ch.start_date} · most points wins</div>
+        <div className="banner-sub">
+          {ch.weeks} weeks · starts {ch.start_date} · most points wins
+          {cheerRows.length > 0 && ` · ${cheerRows.length} cheering 📣`}
+        </div>
       </div>
 
       <main>
         <h3 className="sec">Leaderboard</h3>
         <div className="card">
           {rows.length === 0 ? (
-            <div className="empty">No members yet.</div>
+            <div className="empty">No players yet.</div>
           ) : rows.map((r, i) => {
             const rank = i + 1;
-            const ci = mem.findIndex((m) => m.user_id === r.user_id) % colors.length;
             return (
               <div key={r.user_id} className={`lb-row${r.me ? " me" : ""}`}>
                 <div className={`rank${rank <= 3 ? " g" + rank : ""}`}>{rank}</div>
-                <div className="av" style={{ background: colors[ci] }}>{r.name[0]?.toUpperCase()}</div>
+                <div className="av" style={{ background: colors[r.ci] }}>{r.name[0]?.toUpperCase()}</div>
                 <div className="lb-info">
                   <div className="nm">{r.name}{r.me && <span className="youtag">YOU</span>}{r.role === "owner" && <span className="ownertag">OWNER</span>}</div>
                   <div className="sub">{r.streak > 0 ? <span className="streak">🔥 {r.streak}d clean</span> : <span>—</span>}</div>
@@ -67,6 +74,30 @@ export default async function LeaderboardPage({ params }: { params: { id: string
             );
           })}
         </div>
+
+        {cheerRows.length > 0 && (
+          <>
+            <h3 className="sec">Cheerleading section 📣</h3>
+            <div className="card cheer">
+              {cheerRows.map((r) => (
+                <div key={r.user_id} className={`lb-row cheer-row${r.me ? " me" : ""}`}>
+                  <div className="rank cheer-rank">📣</div>
+                  <div className="av" style={{ background: colors[r.ci] }}>{r.name[0]?.toUpperCase()}</div>
+                  <div className="lb-info">
+                    <div className="nm">{r.name}{r.me && <span className="youtag">YOU</span>}{r.role === "owner" && <span className="ownertag">OWNER</span>}</div>
+                    <div className="sub">{r.streak > 0 ? <span className="streak">🔥 {r.streak}d clean</span> : <span>—</span>}</div>
+                  </div>
+                  <div className="lb-score"><div className="pts">{r.points}</div><div className="of">pts</div></div>
+                </div>
+              ))}
+            </div>
+            <p className="note">
+              Cheerleaders are part of the team but not the contest — they log their own points and
+              keep their streaks, they just don't take a rank and don't play for the pot.
+            </p>
+          </>
+        )}
+
         <p className="note"><b>Nothing is mandatory</b> — do as much or as little as you like. Whoever has the most points when logging closes wins. OTC runs on the honour system — be honest.</p>
       </main>
     </>

@@ -44,6 +44,11 @@ export default async function RulesPage({ params }: { params: { id: string } }) 
             anything else on any given day. The winner is simply whoever collects the most points by the
             end — so do whatever earns you the most.
           </p>
+          <p className="note">
+            <b>Cheerleading section 📣</b> Not everyone has to race. The organiser can move anyone
+            into the cheerleading section: you still log your own points and keep your streaks, but
+            you sit outside the ranks and outside the pot. You can be moved back at any time.
+          </p>
         </div>
 
         <h3 className="sec">Challenge dates</h3>

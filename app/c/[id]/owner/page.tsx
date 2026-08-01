@@ -21,11 +21,13 @@ export default async function OwnerPage({ params }: { params: { id: string } }) 
   if (myMem?.role !== "owner") redirect(`/c/${params.id}`);
 
   const [{ data: members }, { data: bonuses }] = await Promise.all([
-    supabase.from("memberships").select("user_id, role, profiles(display_name)").eq("challenge_id", params.id),
+    supabase.from("memberships").select("user_id, role, cheerleader, profiles(display_name)").eq("challenge_id", params.id),
     supabase.from("bonus_challenges").select("*").eq("challenge_id", params.id).order("week_no"),
   ]);
 
   const mem = (members ?? []) as unknown as Membership[];
+  const playing = mem.filter((m) => !m.cheerleader);
+  const cheer = mem.filter((m) => m.cheerleader);
   const bon = (bonuses ?? []) as BonusChallenge[];
   const byWeek = new Map(bon.map((b) => [b.week_no, b]));
 
@@ -45,15 +47,37 @@ export default async function OwnerPage({ params }: { params: { id: string } }) 
         <InviteBox challengeId={params.id} inviteUrl={inviteUrl} />
       </div>
 
-      <h3 className="sec">Roster ({mem.length})</h3>
+      <h3 className="sec">
+        Roster ({playing.length} playing{cheer.length > 0 ? ` · ${cheer.length} cheering` : ""})
+      </h3>
       <div className="card">
-        {mem.map((m) => (
+        {playing.map((m) => (
           <RosterRow
             key={m.user_id}
             challengeId={params.id}
             userId={m.user_id}
             name={(m as any).profiles?.display_name ?? "Member"}
             role={m.role}
+            cheerleader={false}
+          />
+        ))}
+      </div>
+
+      <h3 className="sec">Cheerleading section 📣</h3>
+      <div className="card">
+        {cheer.length === 0 ? (
+          <div className="empty">
+            Nobody is cheering. Tap <b>Cheerleader</b> on anyone above to move them here — they
+            keep logging their own points, but they drop out of the ranks and the pot.
+          </div>
+        ) : cheer.map((m) => (
+          <RosterRow
+            key={m.user_id}
+            challengeId={params.id}
+            userId={m.user_id}
+            name={(m as any).profiles?.display_name ?? "Member"}
+            role={m.role}
+            cheerleader={true}
           />
         ))}
       </div>

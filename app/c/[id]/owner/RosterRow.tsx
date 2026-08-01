@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { removeMember } from "./actions";
+import { removeMember, setCheerleader } from "./actions";
 
 const colors = ["#31d07a", "#4aa8ff", "#f2b04a", "#c98aff", "#f2645a", "#5ad1c9"];
 
@@ -10,22 +10,46 @@ export default function RosterRow({
   userId,
   name,
   role,
+  cheerleader,
 }: {
   challengeId: string;
   userId: string;
   name: string;
   role: string;
+  cheerleader: boolean;
 }) {
   const [pending, start] = useTransition();
   const color = colors[Math.abs(hash(userId)) % colors.length];
 
+  const sub = cheerleader
+    ? "Cheerleader · not competing"
+    : role === "owner"
+      ? "Organiser"
+      : "Playing";
+
   return (
     <div className="lb-row">
-      <div className="av" style={{ background: color }}>{name[0]?.toUpperCase()}</div>
-      <div className="lb-info">
-        <div className="nm">{name}{role === "owner" && <span className="ownertag">OWNER</span>}</div>
-        <div className="sub"><span>{role === "owner" ? "Organiser" : "Member"}</span></div>
+      <div className="av" style={{ background: cheerleader ? "var(--dim)" : color }}>
+        {cheerleader ? "📣" : name[0]?.toUpperCase()}
       </div>
+      <div className="lb-info">
+        <div className="nm">
+          {name}
+          {role === "owner" && <span className="ownertag">OWNER</span>}
+          {cheerleader && <span className="cheertag">CHEER</span>}
+        </div>
+        <div className="sub"><span>{sub}</span></div>
+      </div>
+
+      <button
+        className="chip"
+        disabled={pending}
+        title={cheerleader ? "Put them back in the running" : "They stay in the challenge but stop competing"}
+        onClick={() => start(async () => { await setCheerleader(challengeId, userId, !cheerleader); })}
+      >
+        {pending ? "…" : cheerleader ? "Back to team" : "Cheerleader"}
+      </button>
+
       {role === "member" && (
         <button
           className="chip"

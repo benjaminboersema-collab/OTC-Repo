@@ -7,7 +7,7 @@ export default async function ProgressPage({ params }: { params: { id: string } 
   const { data: { user } } = await supabase.auth.getUser();
 
   const { data: challenge } = await supabase.from("challenges").select("*").eq("id", params.id).single();
-  const { data: members } = await supabase.from("memberships").select("user_id, role").eq("challenge_id", params.id);
+  const { data: members } = await supabase.from("memberships").select("user_id, role, cheerleader").eq("challenge_id", params.id);
   const { data: allEntries } = await supabase.from("entries").select("*").eq("challenge_id", params.id);
 
   const ch = challenge as Challenge;
@@ -15,11 +15,18 @@ export default async function ProgressPage({ params }: { params: { id: string } 
   const ents = (allEntries ?? []) as Entry[];
   const mine = ents.filter((e) => e.user_id === user?.id);
 
+  // cheerleaders are in the challenge but out of the contest — they don't hold a
+  // rank and they don't count as the leader for anyone else either
+  const competing = new Set(mem.filter((m) => !m.cheerleader).map((m) => m.user_id));
+  const iCheer = mem.some((m) => m.user_id === user?.id && m.cheerleader);
+
   const scores = leaderboard(ents);
   const myTotal = scores.get(user!.id) ?? 0;
-  const sorted = Array.from(scores.entries()).sort((a, b) => b[1] - a[1]);
+  const sorted = Array.from(scores.entries())
+    .filter(([uid]) => competing.has(uid))
+    .sort((a, b) => b[1] - a[1]);
   const leaderPts = sorted[0]?.[1] ?? 0;
-  const rank = sorted.findIndex(([uid]) => uid === user?.id) + 1;
+  const rank = iCheer ? 0 : sorted.findIndex(([uid]) => uid === user?.id) + 1;
   const gap = leaderPts - myTotal;
 
   // this week's breakdown
@@ -46,9 +53,9 @@ export default async function ProgressPage({ params }: { params: { id: string } 
   return (
     <>
       <div className="banner">
-        <div className="row"><h2>Your progress</h2><span className="wk">{rank > 0 ? `Rank ${rank} of ${mem.length}` : "—"}</span></div>
+        <div className="row"><h2>Your progress</h2><span className="wk">{iCheer ? "Cheerleader 📣" : rank > 0 ? `Rank ${rank} of ${competing.size}` : "—"}</span></div>
         <div className="track"><div className="fill" style={{ width: `${leaderPts ? Math.min(100, (myTotal / leaderPts) * 100) : 0}%` }} /></div>
-        <div className="meta"><span>Season total</span><span><b>{myTotal}</b> pts · leader {leaderPts}</span></div>
+        <div className="meta"><span>Season total</span><span><b>{myTotal}</b> pts{iCheer ? " · not competing" : ` · leader ${leaderPts}`}</span></div>
       </div>
 
       <main>
@@ -56,7 +63,10 @@ export default async function ProgressPage({ params }: { params: { id: string } 
           <div className="stat"><div className="v brand">{myTotal}</div><div className="k">Total points</div></div>
           <div className="stat"><div className="v warn">{streak}<small> days</small></div><div className="k">Nutrition streak</div></div>
           <div className="stat"><div className="v accent">{sessionsLogged}</div><div className="k">Sessions logged</div></div>
-          <div className="stat pot"><div className="v">{rank === 1 ? "Leader 👑" : `${gap} pts`}</div><div className="k">Behind the leader</div></div>
+          <div className="stat pot">
+            <div className="v">{iCheer ? "📣" : rank === 1 ? "Leader 👑" : `${gap} pts`}</div>
+            <div className="k">{iCheer ? "Cheering, not competing" : "Behind the leader"}</div>
+          </div>
         </div>
 
         <h3 className="sec">Points by week</h3>

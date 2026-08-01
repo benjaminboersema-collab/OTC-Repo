@@ -65,6 +65,22 @@ export async function removeMember(challengeId: string, userId: string) {
   revalidateAll(challengeId);
 }
 
+/**
+ * Move a player into or out of the cheerleading section.
+ * Cheerleaders keep every point they have logged and can keep logging — they
+ * are just ranked separately and left out of the player count and the pot.
+ */
+export async function setCheerleader(challengeId: string, userId: string, cheerleader: boolean) {
+  const supabase = await assertOwner(challengeId);
+  const { error } = await supabase
+    .from("memberships")
+    .update({ cheerleader })
+    .eq("challenge_id", challengeId)
+    .eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  revalidateAll(challengeId);
+}
+
 /** Save every week's bonus challenge in one go. Blank title = no bonus that week. */
 export async function saveBonuses(challengeId: string, formData: FormData) {
   const supabase = await assertOwner(challengeId);

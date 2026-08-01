@@ -46,6 +46,8 @@ create table if not exists public.memberships (
   challenge_id uuid not null references public.challenges(id) on delete cascade,
   user_id      uuid not null references public.profiles(id) on delete cascade,
   role         text not null default 'member' check (role in ('owner','member')),
+  -- a cheerleader is in the challenge but does not compete: no rank, no pot share
+  cheerleader  boolean not null default false,
   joined_at    timestamptz not null default now(),
   unique (challenge_id, user_id)
 );
@@ -189,6 +191,10 @@ drop policy if exists memberships_insert on public.memberships;
 create policy memberships_insert on public.memberships for insert with check (user_id = auth.uid());
 drop policy if exists memberships_delete on public.memberships;
 create policy memberships_delete on public.memberships for delete using (is_owner(challenge_id) or user_id = auth.uid());
+-- owners move players in and out of the cheerleading section
+drop policy if exists memberships_update on public.memberships;
+create policy memberships_update on public.memberships
+  for update using (is_owner(challenge_id)) with check (is_owner(challenge_id));
 
 -- entries
 drop policy if exists entries_select on public.entries;

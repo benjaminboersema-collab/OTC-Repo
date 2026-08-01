@@ -33,6 +33,8 @@ export interface Membership {
   challenge_id: string;
   user_id: string;
   role: Role;
+  /** In the challenge but not competing: no rank, no pot share. */
+  cheerleader: boolean;
   joined_at: string;
   profiles?: Profile;
 }
