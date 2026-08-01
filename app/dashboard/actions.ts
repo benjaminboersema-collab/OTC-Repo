@@ -32,6 +32,28 @@ export async function createChallenge(formData: FormData) {
   redirect(`/c/${challenge.id}`);
 }
 
+export async function setDisplayName(formData: FormData) {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const name = ((formData.get("display_name") as string) || "").trim().replace(/\s+/g, " ");
+
+  if (name.length < 2) throw new Error("Your name must be at least 2 characters.");
+  if (name.length > 40) throw new Error("Your name must be 40 characters or fewer.");
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ display_name: name })
+    .eq("id", user.id);
+  if (error) throw new Error(error.message);
+
+  // keep the auth metadata in step with the profile row
+  await supabase.auth.updateUser({ data: { display_name: name } });
+
+  revalidatePath("/dashboard");
+}
+
 export async function setPin(formData: FormData) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();

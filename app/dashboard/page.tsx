@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { createChallenge, setPin } from "./actions";
+import { createChallenge, setPin, setDisplayName } from "./actions";
 
 export default async function Dashboard() {
   const supabase = createClient();
@@ -12,6 +12,12 @@ export default async function Dashboard() {
     .from("memberships")
     .select("role, challenges(id, name, start_date, weeks)")
     .order("joined_at", { ascending: false });
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("display_name")
+    .eq("id", user.id)
+    .maybeSingle();
 
   const rows = (memberships ?? []) as any[];
   const today = new Date().toISOString().slice(0, 10);
@@ -65,6 +71,20 @@ export default async function Dashboard() {
             <p className="note">You'll become the owner and get an invite link to send your team.</p>
           </form>
         </div>
+        <h3 className="sec">Your name</h3>
+        <div className="card" style={{ padding: 18 }}>
+          <form action={setDisplayName}>
+            <p className="note" style={{ marginTop: 0 }}>
+              This is how you appear on the leaderboard and the roster.
+            </p>
+            <label className="fld">Display name</label>
+            <input className="input" name="display_name" type="text"
+              defaultValue={profile?.display_name ?? ""} maxLength={40} required
+              placeholder="e.g. Ma Carla" autoComplete="nickname" />
+            <button className="btn ghost mt14" type="submit">Save name</button>
+          </form>
+        </div>
+
         <h3 className="sec">Your PIN</h3>
         <div className="card" style={{ padding: 18 }}>
           <form action={setPin}>
