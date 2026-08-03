@@ -40,6 +40,16 @@ export function weekDaysYMD(anchorYMD: string): string[] {
   return Array.from({ length: 7 }, (_, i) => addDays(start, i));
 }
 
+/**
+ * The seven civil dates of challenge week `weekNo` (1-based).
+ * Week 1 is the Mon–Sun week containing `start_date`, so this is the exact
+ * inverse of `weekNumberYMD`.
+ */
+export function weekDaysForWeek(startDate: string, weekNo: number): string[] {
+  const first = startOfWeekYMD(startDate);
+  return weekDaysYMD(addDays(first, (Math.max(1, weekNo) - 1) * 7));
+}
+
 /** Which challenge week a civil date falls in (1-based). */
 export function weekNumberYMD(startDate: string, dateYMD: string): number {
   const s = noonUTC(startOfWeekYMD(startDate)).getTime();
@@ -94,10 +104,16 @@ export function isClosed(c: Window): boolean {
   return nowHM(tz) >= prettyTime(c.end_time || "18:00");
 }
 
-/** Is this civil date inside the challenge window (and still loggable)? */
+/**
+ * Is this civil date inside the challenge window (and still loggable)?
+ * Past days stay open all the way back to the start — you can always fill in a
+ * day you forgot. The future is not loggable: you can't have trained tomorrow.
+ */
 export function canLogDay(c: Window, day: string): boolean {
+  const tz = c.timezone || "Africa/Johannesburg";
   if (day < c.start_date) return false;      // before the starting gun
   if (day > endYMD(c)) return false;         // after the finish
+  if (day > todayYMD(tz)) return false;      // no logging ahead
   return !isClosed(c);                       // logging has closed for everyone
 }
 

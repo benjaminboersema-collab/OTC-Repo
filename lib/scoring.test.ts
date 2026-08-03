@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import type { Entry } from "./types";
 import {
-  addDays, weekNumberYMD, endYMD, totalWeeks, canLogDay,
+  addDays, weekNumberYMD, weekDaysForWeek, endYMD, totalWeeks, canLogDay, todayYMD,
   leaderboard, breakdown, dayLog, adjustmentTotal, nutritionStreak,
 } from "./scoring";
 
@@ -54,10 +54,49 @@ test("endYMD prefers an explicit end_date", () => {
   assert.equal(totalWeeks({ start_date: "2026-08-03", weeks: 2, end_date: "2026-08-20" }), 3);
 });
 
+test("weekDaysForWeek is the exact inverse of weekNumberYMD", () => {
+  const start = "2026-08-05"; // a Wednesday — week 1 still starts on the Monday
+  const w1 = weekDaysForWeek(start, 1);
+  assert.equal(w1.length, 7);
+  assert.equal(w1[0], "2026-08-03", "week 1 starts on the Monday of the start week");
+  assert.equal(w1[6], "2026-08-09");
+
+  const w3 = weekDaysForWeek(start, 3);
+  assert.equal(w3[0], "2026-08-17");
+
+  // every day of week N must report itself as week N
+  for (const w of [1, 2, 3, 7]) {
+    for (const d of weekDaysForWeek(start, w)) {
+      assert.equal(weekNumberYMD(start, d), w, `${d} should be week ${w}`);
+    }
+  }
+});
+
+test("weekDaysForWeek clamps a nonsense week number to week 1", () => {
+  assert.deepEqual(weekDaysForWeek("2026-08-05", 0), weekDaysForWeek("2026-08-05", 1));
+  assert.deepEqual(weekDaysForWeek("2026-08-05", -4), weekDaysForWeek("2026-08-05", 1));
+});
+
 test("canLogDay refuses days outside the window", () => {
   const c = { start_date: "2026-08-03", weeks: 2, timezone: "Africa/Johannesburg", end_time: "18:00" };
   assert.equal(canLogDay(c, "2026-08-02"), false, "before the start");
   assert.equal(canLogDay(c, "2026-08-17"), false, "after the end");
+});
+
+test("catching up: past days stay open, the future never does", () => {
+  const tz = "Africa/Johannesburg";
+  const today = todayYMD(tz);
+  // a live challenge: started three weeks ago, ends in three weeks
+  const c = { start_date: addDays(today, -21), weeks: 6, end_date: addDays(today, 21), timezone: tz, end_time: "18:00" };
+
+  assert.equal(canLogDay(c, today), true, "today is loggable");
+  assert.equal(canLogDay(c, addDays(today, -1)), true, "yesterday is loggable");
+  assert.equal(canLogDay(c, addDays(today, -7)), true, "last week is loggable");
+  assert.equal(canLogDay(c, addDays(today, -21)), true, "the very first day is loggable");
+
+  assert.equal(canLogDay(c, addDays(today, 1)), false, "tomorrow is not loggable");
+  assert.equal(canLogDay(c, addDays(today, 7)), false, "next week is not loggable");
+  assert.equal(canLogDay(c, addDays(today, -22)), false, "the day before the start is not loggable");
 });
 
 /* ---------- totals ---------- */

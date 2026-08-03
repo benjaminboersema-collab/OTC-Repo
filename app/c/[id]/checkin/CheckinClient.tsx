@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { EX_MAX, type Challenge, type Entry, type NutritionState, type BonusChallenge } from "@/lib/types";
+import { prettyDate } from "@/lib/scoring";
 import { setWorkouts, setNutrition, setHydration, setBonus } from "./actions";
 
 const DOW = ["M", "T", "W", "T", "F", "S", "S"];
@@ -11,6 +13,8 @@ export default function CheckinClient({
   weekDays,
   today,
   weekNo,
+  currentWeek,
+  totalWeeks,
   entries,
   bonus,
   lockedDays,
@@ -20,6 +24,8 @@ export default function CheckinClient({
   weekDays: string[];
   today: string;
   weekNo: number;
+  currentWeek: number;
+  totalWeeks: number;
   entries: Entry[];
   bonus: BonusChallenge | null;
   lockedDays: string[];
@@ -28,6 +34,10 @@ export default function CheckinClient({
   const [pending, start] = useTransition();
   const [toast, setToast] = useState("");
   const [info, setInfo] = useState<string | null>(null);
+
+  const isCurrent = weekNo === currentWeek;
+  const isPast = weekNo < currentWeek;
+  const href = (w: number) => `/c/${challenge.id}/checkin?w=${w}`;
 
   const pop = (m: string) => { setToast(m); setTimeout(() => setToast(""), 1400); };
   const locked = (d: string) => lockedDays.includes(d);
@@ -78,7 +88,10 @@ export default function CheckinClient({
   return (
     <>
       <div className="banner">
-        <div className="row"><h2>This Week</h2><span className="wk">{weekPts} pts</span></div>
+        <div className="row">
+          <h2>{isCurrent ? "This Week" : `Week ${weekNo}`}</h2>
+          <span className="wk">{weekPts} pts</span>
+        </div>
         <div className="track"><div className="fill" style={{ width: `${Math.min(100, (weekPts / 80) * 100)}%` }} /></div>
         <div className="meta">
           <span>{sessions} session{sessions !== 1 ? "s" : ""} · {nutPts} food · {litres}L · +{bonPts} bonus</span>
@@ -92,10 +105,34 @@ export default function CheckinClient({
             <p className="note" style={{ marginTop: 0, color: "var(--warn)" }}>{notice}</p>
           </div>
         )}
+        <nav className="wknav" aria-label="Challenge week">
+          {weekNo > 1
+            ? <Link className="chip" href={href(weekNo - 1)} scroll={false}>◀ Week {weekNo - 1}</Link>
+            : <span className="chip disabled">◀ Week {weekNo - 1}</span>}
+          <Link
+            className={`chip${isCurrent ? " disabled" : " now"}`}
+            href={href(currentWeek)}
+            scroll={false}
+            aria-current={isCurrent ? "page" : undefined}
+          >
+            {isCurrent ? `Week ${weekNo} of ${totalWeeks}` : "Back to this week"}
+          </Link>
+          {weekNo < totalWeeks
+            ? <Link className="chip" href={href(weekNo + 1)} scroll={false}>Week {weekNo + 1} ▶</Link>
+            : <span className="chip disabled">Week {weekNo + 1} ▶</span>}
+        </nav>
+
         <div className="card">
           <div className="checkin-head">
-            <div className="title">Week {weekNo} check-in</div>
-            <div className="date">Nothing&apos;s required — log whatever you do, it all adds points.</div>
+            <div className="title">
+              Week {weekNo} check-in
+              {isPast && <span className="pasttag">CATCHING UP</span>}
+            </div>
+            <div className="date">
+              {isPast
+                ? `${prettyDate(weekDays[0], false)} – ${prettyDate(weekDays[6], false)} · fill in anything you forgot.`
+                : "Nothing's required — log whatever you do, it all adds points."}
+            </div>
           </div>
 
           {/* Exercise */}
@@ -198,14 +235,22 @@ export default function CheckinClient({
                     );
                   })}
                 </div>
-                <p className="note"><b>This week: {bonus.title}</b> — tap each day you hit it. Set by the organiser.</p>
+                <p className="note">
+                  <b>{isCurrent ? "This week" : `Week ${weekNo}`}: {bonus.title}</b> — tap each day you hit it. Set by the organiser.
+                </p>
               </>
             ) : (
-              <p className="note" style={{ marginTop: 0 }}><b>No bonus challenge this week.</b> The organiser can add one from the Owner tab.</p>
+              <p className="note" style={{ marginTop: 0 }}>
+                <b>No bonus challenge {isCurrent ? "this week" : `for week ${weekNo}`}.</b> The organiser can add one from the Owner tab.
+              </p>
             )}
           </div>
         </div>
-        <p className="note" style={{ textAlign: "center" }}>Highlighted cell = today. Tap any day of this week to edit it.</p>
+        <p className="note" style={{ textAlign: "center" }}>
+          Highlighted cell = today. Tap any day to edit it — you can go back to earlier weeks
+          and fill in anything you forgot, right up to the closing time. Days that haven&apos;t
+          happened yet are greyed out.
+        </p>
       </main>
 
       <div className={`toast${toast ? " show" : ""}`}>{toast}</div>

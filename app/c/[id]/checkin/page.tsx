@@ -1,9 +1,20 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Challenge, Entry, BonusChallenge } from "@/lib/types";
-import { todayYMD, weekDaysYMD, weekNumberYMD, canLogDay, endYMD, prettyDate, prettyTime, isClosed } from "@/lib/scoring";
+import {
+  todayYMD, weekDaysForWeek, weekNumberYMD, totalWeeks, canLogDay,
+  endYMD, prettyDate, prettyTime, isClosed,
+} from "@/lib/scoring";
 import CheckinClient from "./CheckinClient";
 
-export default async function CheckinPage({ params }: { params: { id: string } }) {
+export const dynamic = "force-dynamic";
+
+export default async function CheckinPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams?: { w?: string };
+}) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -13,8 +24,15 @@ export default async function CheckinPage({ params }: { params: { id: string } }
 
   const tz = ch?.timezone || "Africa/Johannesburg";
   const today = todayYMD(tz);
-  const days = weekDaysYMD(today);
-  const week = weekNumberYMD(ch.start_date, today);
+  const weeks = totalWeeks(ch);
+
+  // which week is on screen: ?w=N, else the live one — always clamped in range
+  const clamp = (n: number) => Math.min(weeks, Math.max(1, n));
+  const curWeek = clamp(weekNumberYMD(ch.start_date, today));
+  const asked = parseInt(searchParams?.w ?? "", 10);
+  const week = Number.isFinite(asked) ? clamp(asked) : curWeek;
+
+  const days = weekDaysForWeek(ch.start_date, week);
 
   const [{ data: entries }, { data: bonus }] = await Promise.all([
     supabase.from("entries").select("*")
@@ -37,7 +55,9 @@ export default async function CheckinPage({ params }: { params: { id: string } }
       challenge={ch}
       weekDays={days}
       today={today}
-      weekNo={Math.max(1, week)}
+      weekNo={week}
+      currentWeek={curWeek}
+      totalWeeks={weeks}
       entries={(entries ?? []) as Entry[]}
       bonus={(bonus ?? null) as BonusChallenge | null}
       lockedDays={lockedDays}
